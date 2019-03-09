@@ -2,50 +2,41 @@ FROM jupyter/scipy-notebook:latest
 
 USER root
 
-# TODO(lsorber): Reevaluate this when TensorFlow hits 1.13.
-
 # Add NVIDIA repositories to apt-get [1].
 #
-# [1] https://gitlab.com/nvidia/cuda/blob/ubuntu16.04/9.0/base/Dockerfile
-RUN apt-get update && apt-get install -y gnupg && \
-    apt-key adv --fetch-keys http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/7fa2af80.pub && \
-    wget http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1604/x86_64/cuda-repo-ubuntu1604_9.1.85-1_amd64.deb && \
-    apt install ./cuda-repo-ubuntu1604_9.1.85-1_amd64.deb && \
-    wget http://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1604/x86_64/nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb && \
-    apt install ./nvidia-machine-learning-repo-ubuntu1604_1.0.0-1_amd64.deb
-ENV CUDA_VERSION 9.0.176
-ENV CUDA_PKG_VERSION 9-0=$CUDA_VERSION-1
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        cuda-cudart-$CUDA_PKG_VERSION && \
-    ln -s cuda-9.0 /usr/local/cuda && \
+# [1] https://gitlab.com/nvidia/cuda/blob/ubuntu18.04/10.0/base/Dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg2 curl ca-certificates && \
+    curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub | apt-key add - && \
+    echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/cuda.list && \
+    echo "deb https://developer.download.nvidia.com/compute/machine-learning/repos/ubuntu1804/x86_64 /" > /etc/apt/sources.list.d/nvidia-ml.list && \
+    apt-get purge --autoremove -y curl && \
     rm -rf /var/lib/apt/lists/*
-LABEL com.nvidia.volumes.needed="nvidia_driver"
-LABEL com.nvidia.cuda.version="${CUDA_VERSION}"
+ENV CUDA_VERSION 10.0.130
+ENV CUDA_PKG_VERSION 10-0=$CUDA_VERSION-1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-cudart-$CUDA_PKG_VERSION \
+        cuda-compat-10-0=410.48-1 && \
+    ln -s cuda-10.0 /usr/local/cuda && \
+    rm -rf /var/lib/apt/lists/*
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf && \
     echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:${PATH}
 ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
 ENV NVIDIA_VISIBLE_DEVICES all
 ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV NVIDIA_REQUIRE_CUDA "cuda>=9.0"
+ENV NVIDIA_REQUIRE_CUDA "cuda>=10.0 brand=tesla,driver>=384,driver<385"
 
 # Install TensorFlow dependencies [1], [2].
 #
-# [1] https://www.tensorflow.org/install/gpu
-# [2] https://github.com/tensorflow/tensorflow/blob/r1.13/tensorflow/tools/dockerfiles/dockerfiles/gpu.Dockerfile
+# [1] https://www.tensorflow.org/install/gpu#ubuntu_1804_cuda_10
+# [2] https://github.com/tensorflow/tensorflow/blob/r2.0/tensorflow/tools/dockerfiles/dockerfiles/gpu.Dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        cuda-10-0 \
+        libcudnn7=7.4.1.5-1+cuda10.0  \
+        libcudnn7-dev=7.4.1.5-1+cuda10.0
 RUN apt-get update && apt-get install -y \
-        cuda9.0 \
-        cuda-cublas-9-0 \
-        cuda-cufft-9-0 \
-        cuda-curand-9-0 \
-        cuda-cusolver-9-0 \
-        cuda-cusparse-9-0 \
-        libcudnn7=7.2.1.38-1+cuda9.0 \
-        libnccl2=2.2.13-1+cuda9.0 \
-        cuda-command-line-tools-9-0
-RUN apt-get update && apt-get install -y \
-        nvinfer-runtime-trt-repo-ubuntu1604-4.0.1-ga-cuda9.0 && \
-    apt-get update && apt-get install -y \
-        libnvinfer4=4.1.2-1+cuda9.0
+        nvinfer-runtime-trt-repo-ubuntu1804-5.0.2-ga-cuda10.0 && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        libnvinfer-dev=5.0.2-1+cuda10.0
 
 USER $NB_USER
